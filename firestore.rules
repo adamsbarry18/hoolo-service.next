@@ -1,0 +1,119 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Fonctions Helper ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'Admin';
+    }
+
+    function isVendeurRole() {
+      return isSignedIn() && getUserData().role == 'Vendeur';
+    }
+
+    function hasBoutiqueAccess(boutiqueId) {
+      // Tout utilisateur avec rôle opérationnel accède à toutes les boutiques.
+      return isAdmin() || isVendeurRole();
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Règles de Collection ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isSignedIn(); // Permet l'auto-enregistrement initial ou via admin
+      // Admin : tout le profil. Propriétaire : pas de changement de rôle ; boutiqueId hérité (optionnel), une seule première écriture si vide.
+      function userUpdateKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+      function boutiqueIdFirstAssignmentOnly() {
+        return !userUpdateKeys().hasAny(['boutiqueId'])
+          || !('boutiqueId' in resource.data)
+          || resource.data.boutiqueId == null
+          || resource.data.boutiqueId == '';
+      }
+      allow update: if isAdmin()
+        || (isOwner(userId)
+            && !userUpdateKeys().hasAny(['role'])
+            && boutiqueIdFirstAssignmentOnly());
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /boutiques/{boutiqueId} {
+      allow get: if hasBoutiqueAccess(boutiqueId);
+      allow list: if isSignedIn();
+      // Bootstrap : création de la boutique « principale » si la collection était vide (isDefault obligatoire).
+      allow create: if isAdmin()
+        || (isSignedIn() && request.resource.data.isDefault == true);
+      allow update, delete: if isAdmin();
+
+      match /stocks/{stockId} {
+        allow get, list: if hasBoutiqueAccess(boutiqueId);
+        allow create, update: if hasBoutiqueAccess(boutiqueId);
+        allow delete: if isAdmin();
+      }
+      
+      match /stockMovements/{movementId} {
+        allow list, get, create: if hasBoutiqueAccess(boutiqueId);
+        allow update, delete: if isAdmin();
+      }
+
+      match /sales/{saleId} {
+        allow get, list: if hasBoutiqueAccess(boutiqueId);
+        allow create, update: if hasBoutiqueAccess(boutiqueId);
+        allow delete: if isAdmin();
+      }
+
+      match /repairs/{repairId} {
+        allow get, list: if hasBoutiqueAccess(boutiqueId);
+        allow create, update: if hasBoutiqueAccess(boutiqueId);
+        allow delete: if isAdmin();
+      }
+
+      match /payments/{paymentId} {
+        allow get, list: if hasBoutiqueAccess(boutiqueId);
+        allow create, update: if hasBoutiqueAccess(boutiqueId);
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /products/{productId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /clients/{clientId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /transfers/{transferId} {
+      allow get, list, create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    
+    match /logs/{logId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+    }
+  }
+}
