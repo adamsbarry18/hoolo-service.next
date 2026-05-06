@@ -1,6 +1,6 @@
 # Hoolo Service (Next.js)
 
-Application web de gestion commerciale (boutiques, ventes, stock, réparations, clients, comptabilité) branchée sur **Firebase** (Firestore, Auth).
+Application web de gestion commerciale (boutiques, ventes, stock, réparations, clients, comptabilité) branchée sur **Firebase** (Firestore, Auth)
 
 ## Prérequis
 
