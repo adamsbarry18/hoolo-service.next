@@ -46,6 +46,7 @@ import { TableColumnToggle } from "@/components/table/table-column-toggle";
 import { ListSearchBar } from "@/components/table/list-search-bar";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { rowMatchesSearch } from "@/lib/list-search";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const USERS_TABLE_COLUMNS: TableColumnDef[] = [
   { id: "user", label: "Utilisateur", required: true },
@@ -266,8 +267,8 @@ export default function UsersPage() {
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error instanceof Error ? error.message : String(error),
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
       });
     } finally {
       setIsSubmitting(false);
@@ -282,8 +283,8 @@ export default function UsersPage() {
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error instanceof Error ? error.message : String(error),
+        title: "Suppression impossible",
+        description: toUserFacingErrorMessage(error),
       });
     }
   };

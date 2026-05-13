@@ -52,7 +52,8 @@ export const AppHeader = memo(function AppHeader() {
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <SidebarTrigger
           className={cn(
-            "h-9 w-9 shrink-0 rounded-lg border-0 text-sidebar-foreground",
+            "h-9 w-auto shrink-0 rounded-lg border-0 text-sidebar-foreground",
+            "md:w-9 md:min-w-9 md:justify-center",
             "bg-transparent hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
           )}
         />
@@ -140,14 +141,17 @@ export const AppHeader = memo(function AppHeader() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem
+              asChild
+              className="cursor-pointer focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+            >
               <Link href="/profil" className="cursor-pointer">
                 <UserCircle className="h-4 w-4" />
                 Mon profil
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="cursor-pointer text-destructive focus:text-destructive"
+              className="cursor-pointer text-destructive focus:bg-sidebar-accent focus:text-destructive data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-destructive"
               onClick={() => signOut(auth)}
             >
               <LogOut className="h-4 w-4" />

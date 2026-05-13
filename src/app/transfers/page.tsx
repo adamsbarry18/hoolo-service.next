@@ -21,6 +21,7 @@ import { useBoutiqueScope } from '@/contexts/boutique-scope';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { validateTransfer, cancelTransfer } from '@/firebase/services/transfer-service';
 import { useToast } from '@/hooks/use-toast';
+import { toUserFacingErrorMessage } from '@/lib/user-facing-error';
 import { CreateTransferDialog } from '@/components/transfers/CreateTransferDialog';
 import type { TableColumnDef } from '@/hooks/use-table-column-visibility';
 import { useTableColumnVisibility } from '@/hooks/use-table-column-visibility';
@@ -291,8 +292,11 @@ export default function TransfersPage() {
         description: 'Les stocks source et destination ont été mis à jour.',
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erreur';
-      toast({ variant: 'destructive', title: 'Erreur', description: message });
+      toast({
+        variant: 'destructive',
+        title: 'Validation impossible',
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsProcessing(null);
     }
@@ -308,8 +312,11 @@ export default function TransfersPage() {
         description: 'Aucun stock n’a été modifié.',
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erreur';
-      toast({ variant: 'destructive', title: 'Erreur', description: message });
+      toast({
+        variant: 'destructive',
+        title: 'Annulation impossible',
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsProcessing(null);
     }

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { useBoutiqueScope } from "@/contexts/boutique-scope";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { createRepair, updateRepairStatus, type RepairStatus } from "@/firebase/services/repair-service";
 import { generatePDF, PDFData } from "@/lib/pdf-service";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   Dialog,
   DialogContent,
@@ -43,20 +44,10 @@ import { TableColumnToggle } from "@/components/table/table-column-toggle";
 import { ListSearchBar } from "@/components/table/list-search-bar";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { rowMatchesSearch } from "@/lib/list-search";
-import { RepairDetailDialog, type RepairDetailRow } from "@/components/repairs/repair-detail-dialog";
+import type { RepairDetailRow } from "@/components/repairs/repair-detail-view";
+import { REPAIR_STATUS_LABELS } from "@/components/repairs/repair-status-labels";
 
 const DEVICE_TYPES = ["Smartphone", "Tablette", "Ordinateur", "Accessoire", "Console", "Autre"];
-
-const STATUS_LABELS: Record<RepairStatus, { label: string; color: string }> = {
-  reçu: { label: "Reçu", color: "bg-slate-100 text-slate-700" },
-  en_diagnostic: { label: "Diagnostic", color: "bg-orange-100 text-orange-700" },
-  devis_envoyé: { label: "Devis envoyé", color: "bg-blue-100 text-blue-700" },
-  en_cours: { label: "En réparation", color: "bg-indigo-100 text-indigo-700" },
-  terminé: { label: "Terminé", color: "bg-emerald-100 text-emerald-700" },
-  prêt_à_retirer: { label: "Prêt à retirer", color: "bg-emerald-500 text-white" },
-  retiré: { label: "Retiré", color: "bg-gray-100 text-gray-500" },
-  annulé: { label: "Annulé", color: "bg-rose-100 text-rose-700" },
-};
 
 const REPAIRS_TABLE_COLUMNS: TableColumnDef[] = [
   { id: "sheet", label: "N° fiche", defaultVisible: false },
@@ -80,7 +71,7 @@ function renderRepairCells(
   ctx: {
     onStatusChange: (id: string, status: RepairStatus) => void;
     onPrint: (r: RepairRow) => void;
-    onDetail: (r: RepairRow) => void;
+    onOpenSheet: (r: RepairRow) => void;
   }
 ) {
   switch (col.id) {
@@ -113,12 +104,12 @@ function renderRepairCells(
             onValueChange={(val) => ctx.onStatusChange(repair.id, val as RepairStatus)}
           >
             <SelectTrigger
-              className={`h-auto min-h-9 w-full max-w-[200px] whitespace-normal py-1.5 text-left ${STATUS_LABELS[repair.status as RepairStatus]?.color || ""}`}
+              className={`h-auto min-h-9 w-full max-w-[200px] whitespace-normal py-1.5 text-left ${REPAIR_STATUS_LABELS[repair.status as RepairStatus]?.color || ""}`}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.entries(STATUS_LABELS) as [RepairStatus, { label: string }][]).map(([key, { label }]) => (
+              {(Object.entries(REPAIR_STATUS_LABELS) as [RepairStatus, { label: string }][]).map(([key, { label }]) => (
                 <SelectItem key={key} value={key}>
                   {label}
                 </SelectItem>
@@ -153,12 +144,25 @@ function renderRepairCells(
     case "actions":
       return (
         <TableCell key={col.id} className="text-right">
-          <div className="flex flex-wrap justify-end gap-1">
-            <Button variant="outline" size="sm" className="h-8" type="button" onClick={() => ctx.onDetail(repair)}>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 min-w-[74px] px-2 text-xs sm:px-2.5 sm:text-sm"
+              type="button"
+              onClick={() => ctx.onOpenSheet(repair)}
+            >
               <Eye size={14} className="mr-1" /> Fiche
             </Button>
-            <Button variant="ghost" size="icon" type="button" onClick={() => ctx.onPrint(repair)} aria-label="PDF">
-              <FileText size={16} className="text-muted-foreground" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 min-w-[74px] px-2 text-xs sm:px-2.5 sm:text-sm"
+              type="button"
+              onClick={() => ctx.onPrint(repair)}
+            >
+              <FileText size={14} className="mr-1" />
+              Imprimer
             </Button>
           </div>
         </TableCell>
@@ -172,7 +176,6 @@ const ACTIVE_STATUSES: RepairStatus[] = ["reçu", "en_diagnostic", "devis_envoy�
 
 function RepairsPageInner() {
   const [isAdding, setIsAdding] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
   const [newRepair, setNewRepair] = useState({
     customerName: "",
     phoneNumber: "",
@@ -194,7 +197,6 @@ function RepairsPageInner() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const pathname = usePathname();
 
   const boutiqueId = activeBoutiqueId;
 
@@ -203,40 +205,15 @@ function RepairsPageInner() {
     return query(collection(firestore, "boutiques", boutiqueId, "repairs"), orderBy("updatedAt", "desc"), limit(120));
   }, [firestore, boutiqueId]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, "products"), orderBy("name", "asc"));
-  }, [firestore]);
-
-  const stocksQuery = useMemoFirebase(() => {
-    if (!firestore || !boutiqueId) return null;
-    return query(collection(firestore, "boutiques", boutiqueId, "stocks"));
-  }, [firestore, boutiqueId]);
-
   const { data: repairs, isLoading } = useCollection(repairsQuery);
-  const { data: products } = useCollection(productsQuery);
-  const { data: stocks } = useCollection(stocksQuery);
-
-  const detailRepair = useMemo((): RepairRow | null => {
-    if (!detailId || !repairs?.length) return null;
-    return (repairs.find((r) => r.id === detailId) as RepairRow) ?? null;
-  }, [detailId, repairs]);
 
   useEffect(() => {
     const rid = searchParams.get("repair");
     if (!rid || !repairs?.length) return;
     if (repairs.some((r) => r.id === rid)) {
-      setDetailId(rid);
+      router.replace(`/repairs/${rid}`);
     }
-  }, [searchParams, repairs]);
-
-  const clearRepairDeepLink = useCallback(() => {
-    const sp = new URLSearchParams(searchParams.toString());
-    if (!sp.has("repair")) return;
-    sp.delete("repair");
-    const q = sp.toString();
-    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-  }, [router, searchParams, pathname]);
+  }, [searchParams, repairs, router]);
 
   const { visibility, setColumnVisible, visibleColumns } = useTableColumnVisibility(
     "hoolo:table:repairs:v3",
@@ -292,8 +269,8 @@ function RepairsPageInner() {
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur",
+        title: "Création impossible",
+        description: toUserFacingErrorMessage(error),
       });
     }
   };
@@ -304,13 +281,13 @@ function RepairsPageInner() {
       await updateRepairStatus(firestore, boutiqueId, repairId, status);
       toast({
         title: "Statut mis à jour",
-        description: `Étape : ${STATUS_LABELS[status].label}`,
+        description: `Étape : ${REPAIR_STATUS_LABELS[status].label}`,
       });
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur",
+        title: "Mise à jour impossible",
+        description: toUserFacingErrorMessage(error),
       });
     }
   };
@@ -335,7 +312,7 @@ function RepairsPageInner() {
       notes: [
         `Pièces (estimé dossier) : ${(repair.partsCost ?? 0).toLocaleString()} GNF`,
         `IMEI/SN : ${repair.serialNumber || "N/A"}`,
-        `Statut : ${STATUS_LABELS[repair.status as RepairStatus]?.label ?? repair.status}`,
+        `Statut : ${REPAIR_STATUS_LABELS[repair.status as RepairStatus]?.label ?? repair.status}`,
         repair.internalNotes ? `Notes atelier : ${repair.internalNotes}` : "",
       ]
         .filter(Boolean)
@@ -593,9 +570,9 @@ function RepairsPageInner() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tous les statuts</SelectItem>
-              {(Object.keys(STATUS_LABELS) as RepairStatus[]).map((s) => (
+              {(Object.keys(REPAIR_STATUS_LABELS) as RepairStatus[]).map((s) => (
                 <SelectItem key={s} value={s}>
-                  {STATUS_LABELS[s].label}
+                  {REPAIR_STATUS_LABELS[s].label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -647,7 +624,7 @@ function RepairsPageInner() {
                           renderRepairCells(col, repair as RepairRow, {
                             onStatusChange: handleStatusChange,
                             onPrint: handlePrintRepair,
-                            onDetail: (r) => setDetailId(r.id),
+                            onOpenSheet: (r) => router.push(`/repairs/${r.id}`),
                           })
                         )}
                       </TableRow>
@@ -658,22 +635,6 @@ function RepairsPageInner() {
             </div>
           </CardContent>
         </Card>
-
-        <RepairDetailDialog
-          open={!!detailId}
-          onOpenChange={(open) => {
-            if (!open) {
-              setDetailId(null);
-              clearRepairDeepLink();
-            }
-          }}
-          repair={detailRepair}
-          boutiqueId={boutiqueId}
-          products={products ?? undefined}
-          stocks={stocks ?? undefined}
-          statusMap={STATUS_LABELS}
-          onStatusChange={handleStatusChange}
-        />
       </div>
     </AppLayout>
   );

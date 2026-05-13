@@ -1,11 +1,13 @@
 # .github/workflows/ci-cd.yml
-# Même schéma que cashflow.next : déploiement production Vercel sur push main.
+# - CI : `npm run build` à chaque push / PR (Next est configuré avec ignoreBuildErrors)
+# - Déploiement production Vercel uniquement en manuel : Actions → « CI/CD Pipeline » → Run workflow
+#
 # Secrets GitHub du dépôt (Réglages → Secrets) :
 #   VERCEL_TOKEN      - https://vercel.com/account/tokens
 #   VERCEL_ORG_ID     - .vercel/project.json ou paramètres équipe
-#   VERCEL_PROJECT_ID - id du projet Vercel « Hoolo Service » (pas celui de cashflow)
+#   VERCEL_PROJECT_ID - id du projet Vercel « Hoolo Service »
 #
-# Variables d’environnement Firebase : à renseigner dans Vercel (Projet → Settings → Environment Variables),
+# Variables Firebase : dans Vercel (Settings → Environment Variables),
 # reproduire les clés NEXT_PUBLIC_FIREBASE_* de .env.example
 name: CI/CD Pipeline
 
@@ -14,12 +16,37 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy to Vercel
+  ci:
+    name: Build (vérification)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Vercel (manuel)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,7 +54,6 @@ jobs:
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
-          # L’action pinne vercel@25.x par défaut ; l’API Vercel exige CLI ≥ 47.2.2
           vercel-version: 53.1.0
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState, useEffect, useRef } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,22 +12,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   Bell,
@@ -42,13 +37,12 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Settings,
-  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { BRAND_LOGO_MARK } from "@/lib/brand-assets";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { cn } from "@/lib/utils";
 
@@ -135,11 +129,38 @@ function navItemActive(pathname: string, href: string) {
 
 export const AppSidebar = memo(function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { profile, isUserLoading } = useUser();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, openMobile } = useSidebar();
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (!openMobile) setSettingsMenuOpen(false);
+  }, [openMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !settingsMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (settingsMenuRef.current?.contains(target)) return;
+      setSettingsMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [isMobile, settingsMenuOpen]);
 
   const closeMobileNav = () => {
     if (isMobile) setOpenMobile(false);
+  };
+
+  const navigateSettingsLink = (href: string) => {
+    setSettingsMenuOpen(false);
+    router.push(href);
+    requestAnimationFrame(() => {
+      closeMobileNav();
+    });
   };
 
   const filteredMain = useMemo(
@@ -159,7 +180,9 @@ export const AppSidebar = memo(function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="border-0 p-1">
-      <SidebarHeader className="gap-2 px-3 py-3">
+      <SidebarHeader
+        className={cn("gap-2 px-3 py-3", isMobile && "pr-12")}
+      >
         <div className="flex items-center gap-2.5">
           <div
             className={cn(
@@ -230,55 +253,66 @@ export const AppSidebar = memo(function AppSidebar() {
       {showSettingsGroup ? (
         <SidebarFooter className="border-t border-sidebar-border p-2">
           <SidebarMenu>
-            {isMobile ? (
-              <SidebarMenuItem>
-                <Collapsible
-                  defaultOpen={settingsSectionActive}
-                  className="group/coll-settings w-full"
-                >
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                      isActive={settingsSectionActive}
-                      title="Paramètres"
+            <SidebarMenuItem className="relative" ref={settingsMenuRef}>
+              {isMobile ? (
+                <>
+                  <SidebarMenuButton
+                    type="button"
+                    isActive={settingsSectionActive}
+                    title="Paramètres"
+                    aria-expanded={settingsMenuOpen}
+                    onClick={() => setSettingsMenuOpen((v) => !v)}
+                    className={cn(
+                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      "data-[state=open]:bg-[hsl(var(--sidebar-active))]",
+                      "data-[state=open]:text-sidebar-accent-foreground",
+                      "data-[state=open]:shadow-sm data-[state=open]:ring-1",
+                      "data-[state=open]:ring-primary/20"
+                    )}
+                  >
+                    <Settings className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Paramètres</span>
+                  </SidebarMenuButton>
+
+                  {settingsMenuOpen ? (
+                    <div
                       className={cn(
-                        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        "group-data-[state=open]/coll-settings:bg-[hsl(var(--sidebar-active))]",
-                        "group-data-[state=open]/coll-settings:text-sidebar-accent-foreground",
-                        "group-data-[state=open]/coll-settings:shadow-sm group-data-[state=open]/coll-settings:ring-1",
-                        "group-data-[state=open]/coll-settings:ring-primary/20"
+                        "absolute bottom-full left-0 z-[220] mb-2 w-[min(calc(100vw-2rem),18rem)] rounded-xl border bg-popover p-0 text-popover-foreground shadow-lg",
+                        "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-150"
                       )}
                     >
-                      <Settings className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Paramètres</span>
-                      <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/coll-settings:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      {filteredSettings.map((item) => (
-                        <SidebarMenuSubItem key={item.href}>
-                          <SidebarMenuSubButton
-                            asChild
-                            size="md"
-                            isActive={navItemActive(pathname, item.href)}
+                      <div className="px-3 py-3">
+                        <p className="text-sm font-semibold leading-none text-popover-foreground">
+                          Paramètres
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Configuration et administration
+                        </p>
+                      </div>
+                      <Separator />
+                      <nav className="flex flex-col py-1" aria-label="Paramètres">
+                        {filteredSettings.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2.5 text-sm text-popover-foreground outline-none transition-colors",
+                            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
+                            "focus-visible:bg-sidebar-accent focus-visible:text-sidebar-accent-foreground",
+                              navItemActive(pathname, item.href) && "bg-accent/60 font-medium"
+                            )}
+                            onClick={() => navigateSettingsLink(item.href)}
                           >
-                            <Link
-                              href={item.href}
-                              className="cursor-pointer"
-                              onClick={closeMobileNav}
-                            >
-                              <item.icon className="text-muted-foreground" />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </Collapsible>
-              </SidebarMenuItem>
-            ) : (
-              <SidebarMenuItem>
+                            <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span>{item.title}</span>
+                          </Link>
+                        ))}
+                      </nav>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton
@@ -297,31 +331,45 @@ export const AppSidebar = memo(function AppSidebar() {
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="w-52 rounded-lg shadow-md"
+                    className={cn(
+                      "z-[200] w-56 min-w-[14rem] rounded-xl border bg-popover py-1 text-popover-foreground shadow-lg",
+                    )}
                     side="top"
                     align="start"
-                    sideOffset={8}
+                    sideOffset={10}
+                    collisionPadding={12}
                   >
+                    <DropdownMenuLabel className="px-3 py-3 font-normal">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm font-semibold leading-none text-popover-foreground">
+                          Paramètres
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Configuration et administration
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
                     {filteredSettings.map((item) => (
                       <DropdownMenuItem
                         key={item.href}
                         asChild
-                        className="focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
+                        className="cursor-pointer gap-2 px-3 py-2.5 focus:bg-sidebar-accent focus:text-sidebar-accent-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground"
                       >
                         <Link
                           href={item.href}
-                          className="cursor-pointer gap-2"
+                          className="flex cursor-pointer items-center gap-2"
                           onClick={closeMobileNav}
                         >
-                          <item.icon className="h-4 w-4 text-muted-foreground" />
+                          <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span>{item.title}</span>
                         </Link>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </SidebarMenuItem>
-            )}
+              )}
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
       ) : null}

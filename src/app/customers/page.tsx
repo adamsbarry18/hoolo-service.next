@@ -72,6 +72,7 @@ import type { TableColumnDef } from "@/hooks/use-table-column-visibility";
 import { useTableColumnVisibility } from "@/hooks/use-table-column-visibility";
 import { TableColumnToggle } from "@/components/table/table-column-toggle";
 import { useToast } from "@/hooks/use-toast";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 const CUSTOMERS_TABLE_COLUMNS: TableColumnDef[] = [
   { id: "client", label: "Client", required: true },
@@ -390,8 +391,11 @@ export default function CustomersPage() {
       setEditOpen(false);
       setEditClient(null);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -431,8 +435,11 @@ export default function CustomersPage() {
       setIsAdding(false);
       setNewClient({ name: "", email: "", phoneNumber: "", creditLimit: 0, notes: "" });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Impossible d’ajouter le client.";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Ajout impossible",
+        description: toUserFacingErrorMessage(error, "Impossible d’ajouter le client."),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -455,8 +462,11 @@ export default function CustomersPage() {
       await deleteDoc(doc(firestore, "clients", id));
       toast({ title: "Client supprimé" });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Suppression impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     }
   };
 

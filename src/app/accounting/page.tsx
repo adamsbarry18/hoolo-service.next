@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart3,
-  Download,
   Calculator,
+  Download,
   TrendingDown,
   TrendingUp,
   Loader2,
@@ -334,7 +334,7 @@ export default function AccountingPage() {
 
   const loading = loadingSales || loadingProducts || loadingStocks || loadingPayments;
 
-  const handleGrandLivre = () => {
+  const handleGrandLivreCsv = () => {
     if (!boutiqueId || !sales.length) {
       toast({
         title: "Export vide",
@@ -372,10 +372,9 @@ export default function AccountingPage() {
     }
   };
 
-  const handleReportExport = () => {
+  const buildReportCsvRows = () => {
     if (!boutiqueId || !sales.length) {
-      toast({ variant: "destructive", title: "Données insuffisantes" });
-      return;
+      return null;
     }
     const { start, end, label } = reportRange();
     const sliceSales = salesBetween(sales, start, end);
@@ -399,6 +398,16 @@ export default function AccountingPage() {
       ["Détail ventes (extrait)", ""],
       ...ledgerCsvRows(sliceSales).slice(0, 201),
     ];
+    return { rows, label, sliceSales, slicePay, ca, marge, encV, encR };
+  };
+
+  const handleReportCsv = () => {
+    const report = buildReportCsvRows();
+    if (!report) {
+      toast({ variant: "destructive", title: "Données insuffisantes" });
+      return;
+    }
+    const { rows, label } = report;
     downloadCsv(
       `rapport_${label.replace(/\s+/g, "_")}_${boutiqueId}_${new Date().toISOString().slice(0, 10)}.csv`,
       rows
@@ -459,7 +468,7 @@ export default function AccountingPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={handleGrandLivre} disabled={loading}>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={handleGrandLivreCsv} disabled={loading}>
               <Download className="mr-2 h-4 w-4" /> Grand livre CSV
             </Button>
             <Button className="w-full bg-primary sm:w-auto" onClick={() => setReportOpen(true)} disabled={loading}>
@@ -809,7 +818,7 @@ export default function AccountingPage() {
               <Button variant="outline" onClick={() => setReportOpen(false)}>
                 Annuler
               </Button>
-              <Button className="bg-primary" onClick={handleReportExport} disabled={loading}>
+              <Button className="bg-primary" onClick={handleReportCsv} disabled={loading}>
                 Télécharger CSV
               </Button>
             </DialogFooter>

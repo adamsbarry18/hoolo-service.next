@@ -21,6 +21,7 @@ import {
   updateClientCreditLimit,
 } from "@/firebase/services/credit-service";
 import { getAppSettings } from "@/firebase/services/settings-service";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 import {
   Dialog,
   DialogContent,
@@ -302,8 +303,11 @@ export default function CreditsPage() {
       setRepaymentAmount("");
       setRepaymentNote("");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -322,8 +326,11 @@ export default function CreditsPage() {
       toast({ title: "Plafond mis à jour", description: `Nouveau plafond : ${Math.floor(v).toLocaleString()} GNF` });
       setIsLimitOpen(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Mise à jour impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsProcessing(false);
     }

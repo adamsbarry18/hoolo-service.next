@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { Menu, PanelLeft } from "lucide-react"
+import { Menu, PanelLeft, X } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -207,7 +207,19 @@ const Sidebar = React.forwardRef<
             side={side}
           >
             <SheetTitle className="sr-only">Menu de navigation</SheetTitle>
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="relative flex h-full w-full flex-col">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 z-[60] h-9 w-9 shrink-0 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
+                onClick={() => setOpenMobile(false)}
+                aria-label="Fermer le menu"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </Button>
+              {children}
+            </div>
           </SheetContent>
         </Sheet>
       )
@@ -271,8 +283,11 @@ const SidebarTrigger = React.forwardRef<
       ref={ref}
       data-sidebar="trigger"
       variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
+      size={isMobile ? "sm" : "icon"}
+      className={cn(
+        isMobile ? "h-9 gap-2 px-2.5 font-medium text-foreground" : "h-7 w-7",
+        className
+      )}
       aria-label={isMobile ? "Ouvrir ou fermer le menu de navigation" : "Afficher ou masquer la barre latérale"}
       aria-expanded={isMobile ? openMobile : undefined}
       onClick={(event) => {
@@ -282,13 +297,16 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       {isMobile ? (
-        <Menu className="h-5 w-5" aria-hidden />
+        <>
+          <Menu className="h-5 w-5 shrink-0" aria-hidden />
+          <span>Menu</span>
+        </>
       ) : (
-        <PanelLeft className="h-5 w-5" aria-hidden />
+        <>
+          <PanelLeft className="h-5 w-5" aria-hidden />
+          <span className="sr-only">Basculer la barre latérale</span>
+        </>
       )}
-      <span className="sr-only">
-        {isMobile ? "Menu" : "Basculer la barre latérale"}
-      </span>
     </Button>
   )
 })
@@ -659,10 +677,8 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Keep deterministic output to avoid SSR/CSR hydration mismatch.
+  const width = "72%"
 
   return (
     <div

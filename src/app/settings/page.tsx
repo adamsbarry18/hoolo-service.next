@@ -26,6 +26,7 @@ import {
 import { useFirestore, useUser } from "@/firebase";
 import { getAppSettings, saveAppSettings, AppSettings, normalizeAppSettings } from "@/firebase/services/settings-service";
 import { useToast } from "@/hooks/use-toast";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 export default function SettingsPage() {
   const { profile, isUserLoading } = useUser();
@@ -90,8 +91,12 @@ export default function SettingsPage() {
     try {
       await saveAppSettings(firestore, settings);
       toast({ title: "Paramètres enregistrés", description: "Les modifications ont été appliquées avec succès." });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Erreur", description: error.message });
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsSaving(false);
     }

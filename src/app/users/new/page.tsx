@@ -21,6 +21,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuthForAdminUserCreation } from "@/firebase/secondary-auth-app";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthErrorFeedback, toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 function buildDisplayName(firstName: string, lastName: string, email: string): string {
   const full = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
@@ -55,7 +56,7 @@ export default function NewUserPage() {
         toast({
           variant: "destructive",
           title: "Mot de passe trop court",
-          description: "Au moins 6 caractères (exigence Firebase).",
+          description: "Le mot de passe doit contenir au moins 6 caractères.",
         });
         return;
       }
@@ -84,34 +85,12 @@ export default function NewUserPage() {
         );
         uid = cred.user.uid;
       } catch (authErr: unknown) {
-        const code = (authErr as { code?: string })?.code;
-        const message = (authErr as Error)?.message;
-        if (code === "auth/email-already-in-use") {
-          toast({
-            variant: "destructive",
-            title: "E-mail déjà utilisé",
-            description:
-              "Un compte existe déjà dans Authentication avec cette adresse.",
-          });
-        } else if (code === "auth/weak-password") {
-          toast({
-            variant: "destructive",
-            title: "Mot de passe trop faible",
-            description: message ?? "Choisissez un mot de passe plus long.",
-          });
-        } else if (code === "auth/invalid-email") {
-          toast({
-            variant: "destructive",
-            title: "E-mail invalide",
-            description: message,
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Création du compte impossible",
-            description: message ?? String(authErr),
-          });
-        }
+        const feedback = getAuthErrorFeedback(authErr, "createUser");
+        toast({
+          variant: feedback.variant ?? "destructive",
+          title: feedback.title,
+          description: feedback.description,
+        });
         return;
       } finally {
         await signOut(secondaryAuth).catch(() => {});
@@ -127,14 +106,14 @@ export default function NewUserPage() {
       toast({
         title: "Utilisateur créé",
         description:
-          "Compte Firebase et profil enregistrés. L’utilisateur peut se connecter avec cet e-mail et ce mot de passe.",
+          "Compte et profil enregistrés. La personne peut se connecter avec cet e-mail et ce mot de passe.",
       });
       router.push("/users");
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error instanceof Error ? error.message : String(error),
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
       });
     } finally {
       setIsSubmitting(false);
@@ -174,8 +153,8 @@ export default function NewUserPage() {
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">Nouvel utilisateur</CardTitle>
             <CardDescription className="text-pretty">
-              Création du compte Firebase (e-mail + mot de passe) et du profil Firestore. Après
-              validation, vous êtes renvoyé vers la liste du personnel.
+              Création du compte (e-mail et mot de passe) et du profil dans l’application. Après validation, vous êtes
+              renvoyé vers la liste du personnel.
             </CardDescription>
           </CardHeader>
           <CardContent>

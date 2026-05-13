@@ -224,7 +224,7 @@ export async function updateRepairStatus(
       } est prêt à être récupéré.`,
       type: 'repair_ready',
       boutiqueId,
-      link: `/repairs?repair=${encodeURIComponent(repairId)}`,
+      link: `/repairs/${encodeURIComponent(repairId)}`,
     });
   }
 }

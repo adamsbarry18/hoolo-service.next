@@ -23,6 +23,7 @@ import { Loader2, ArrowRight, Search } from 'lucide-react';
 import { rowMatchesSearch } from '@/lib/list-search';
 import { productListLabel } from '@/lib/product-display';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { toUserFacingErrorMessage } from '@/lib/user-facing-error';
 
 interface CreateTransferDialogProps {
   open: boolean;
@@ -159,8 +160,11 @@ export function CreateTransferDialog({ open, onOpenChange }: CreateTransferDialo
       });
       onOpenChange(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erreur';
-      toast({ variant: 'destructive', title: 'Erreur', description: message });
+      toast({
+        variant: 'destructive',
+        title: 'Création impossible',
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsSubmitting(false);
     }

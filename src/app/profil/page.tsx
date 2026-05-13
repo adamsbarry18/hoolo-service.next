@@ -32,6 +32,7 @@ import {
 } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { userAvatarInlineStyle, userInitialsFromNames } from "@/lib/user-avatar";
+import { getAuthErrorFeedback, toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 function buildDisplayName(firstName: string, lastName: string, email: string): string {
   const full = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
@@ -117,8 +118,8 @@ export default function ProfilPage() {
         description: "Vos informations ont été mises à jour.",
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      const message = toUserFacingErrorMessage(error);
+      toast({ variant: "destructive", title: "Enregistrement impossible", description: message });
     } finally {
       setIsSaving(false);
     }
@@ -140,7 +141,7 @@ export default function ProfilPage() {
       toast({
         variant: "destructive",
         title: "Nouveau mot de passe trop court",
-        description: "Au moins 6 caractères (exigence Firebase).",
+        description: "Le mot de passe doit contenir au moins 6 caractères.",
       });
       return;
     }
@@ -166,27 +167,12 @@ export default function ProfilPage() {
         description: "Utilisez-le dès votre prochaine connexion sur un autre appareil.",
       });
     } catch (error: unknown) {
-      const code = (error as { code?: string })?.code;
-      const message = (error as Error)?.message;
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        toast({
-          variant: "destructive",
-          title: "Mot de passe actuel incorrect",
-          description: "Vérifiez votre saisie ou utilisez « Mot de passe oublié » sur l’écran de connexion.",
-        });
-      } else if (code === "auth/weak-password") {
-        toast({
-          variant: "destructive",
-          title: "Mot de passe trop faible",
-          description: message ?? "Choisissez un mot de passe plus long.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Impossible de changer le mot de passe",
-          description: message ?? String(error),
-        });
-      }
+      const feedback = getAuthErrorFeedback(error, "changePassword");
+      toast({
+        variant: feedback.variant ?? "destructive",
+        title: feedback.title,
+        description: feedback.description,
+      });
     } finally {
       setIsPwSaving(false);
     }

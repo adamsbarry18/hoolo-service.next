@@ -12,6 +12,7 @@ import { useAuth } from "@/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthErrorFeedback } from "@/lib/user-facing-error";
 import {
   Dialog,
   DialogContent,
@@ -41,11 +42,12 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const feedback = getAuthErrorFeedback(error, "signIn");
       toast({
-        variant: "destructive",
-        title: "Échec de connexion",
-        description: error.message || "Veuillez vérifier vos identifiants.",
+        variant: feedback.variant ?? "destructive",
+        title: feedback.title,
+        description: feedback.description,
       });
     } finally {
       setIsLoading(false);
@@ -65,11 +67,12 @@ export default function LoginPage() {
       });
       setIsResetDialogOpen(false);
       setResetEmail("");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const feedback = getAuthErrorFeedback(error, "passwordReset");
       toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible d'envoyer l'e-mail de réinitialisation.",
+        variant: feedback.variant ?? "destructive",
+        title: feedback.title,
+        description: feedback.description,
       });
     } finally {
       setIsResetLoading(false);

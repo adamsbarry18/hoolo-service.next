@@ -55,6 +55,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ListSearchBar } from "@/components/table/list-search-bar";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { rowMatchesSearch } from "@/lib/list-search";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 
 type BoutiqueStatus = "active" | "inactive";
 
@@ -217,8 +218,11 @@ export default function BoutiquesPage() {
       setEditingId(null);
       setFormData(defaultForm);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Enregistrement impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -228,9 +232,8 @@ export default function BoutiquesPage() {
     if (!firestore) return;
     const msg =
       `Supprimer définitivement « ${b.name} » ?\n\n` +
-      `Le document boutique sera supprimé. Les sous-collections Firestore ` +
-      `(stocks, ventes, réparations…) rattachées à cet ID peuvent rester sur le serveur : ` +
-      `nettoyez-les si besoin depuis la console Firebase.`;
+      `Le point de vente sera retiré de la liste. Les données associées (stocks, ventes, réparations, etc.) ` +
+      `peuvent subsister côté serveur : faites le ménage avec l’aide d’un administrateur technique si nécessaire.`;
     if (!window.confirm(msg)) return;
 
     try {
@@ -244,8 +247,11 @@ export default function BoutiquesPage() {
           "Vérifiez les transferts de stock et les données encore liées à ce point de vente si besoin.",
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Suppression impossible", description: message });
+      toast({
+        variant: "destructive",
+        title: "Suppression impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     }
   };
 

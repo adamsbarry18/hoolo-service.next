@@ -43,6 +43,7 @@ import {
   limit,
 } from "firebase/firestore";
 import { generatePDF, shareOnWhatsApp, PDFData } from "@/lib/pdf-service";
+import { toUserFacingErrorMessage } from "@/lib/user-facing-error";
 import { notifyStockLowCrossing } from "@/firebase/services/notification-service";
 import {
   Dialog,
@@ -453,8 +454,11 @@ export default function SalesPage() {
         description: "Stock et créance client mis à jour.",
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      toast({ variant: "destructive", title: "Erreur", description: message });
+      toast({
+        variant: "destructive",
+        title: "Vente impossible",
+        description: toUserFacingErrorMessage(error),
+      });
     } finally {
       setIsProcessing(false);
     }
